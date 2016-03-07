@@ -15,18 +15,22 @@ minecraft = pexpect.spawn(commandline,timeout=None,encoding=None)
 running = minecraft.isalive()
 
 while(running):
+
+    # Read Minecraft console
     result = minecraft.expect([
         #0
         pexpect.EOF,
         #1
-        '\[[0-9]+:[0-9]+:[0-9]+.*INFO\]: ',
+        pexpect.TIMEOUT,
         #2
-        '\[[0-9]+:[0-9]+:[0-9]+.*WARN\]: ',
+        '\[[0-9]+:[0-9]+:[0-9]+.*INFO\]: ',
         #3
-        '^\w+ joined the game\r\n',
+        '\[[0-9]+:[0-9]+:[0-9]+.*WARN\]: ',
         #4
+        '^\w+ joined the game\r\n',
+        #5
         '\r\n'
-        ])
+        ],timeout=10)
     
     # Show all unmatched output
     print(minecraft.before.replace(b'\r',b'').decode(),end='')
@@ -34,11 +38,13 @@ while(running):
     if result == 0:
         running = False
     elif result == 1:
-        print('\033[32m'+minecraft.after.replace(b'\r',b'').decode()+'\033[m',end='')
+        1
     elif result == 2:
-        print('\033[33m'+minecraft.after.replace(b'\r',b'').decode()+'\033[m',end='')
+        print('\033[32m'+minecraft.after.replace(b'\r',b'').decode()+'\033[m',end='')
     elif result == 3:
+        print('\033[33m'+minecraft.after.replace(b'\r',b'').decode()+'\033[m',end='')
+    elif result == 4:
         print(minecraft.after.replace(b'\r',b'').decode(),end='')
         minecraft.sendline('say Welcome, ' + minecraft.after.replace(b' joined the game\r\n',b'').decode())
-    elif result == 4:
+    elif result == 5:
         print(minecraft.after.replace(b'\r',b'').decode(),end='')
