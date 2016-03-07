@@ -19,14 +19,12 @@ while(running):
         #0
         pexpect.EOF,
         #1
-        'You need to agree to the EULA in order to run the server. Go to eula.txt for more info.\r\n',
-        #2
         '\[[0-9]+:[0-9]+:[0-9]+.*INFO\]: ',
-        #3
+        #2
         '\[[0-9]+:[0-9]+:[0-9]+.*WARN\]: ',
-        #4
+        #3
         '^\w+ joined the game\r\n',
-        #5
+        #4
         '\r\n'
         ])
     
@@ -34,16 +32,13 @@ while(running):
     print(minecraft.before.replace(b'\r',b'').decode(),end='')
 
     if result == 0:
-        print('Server has stopped')
         running = False
     elif result == 1:
-        print('\033[31m\033[1meula.txt needs to be completed\033[m')
-    elif result == 2:
         print('\033[32m'+minecraft.after.replace(b'\r',b'').decode()+'\033[m',end='')
-    elif result == 3:
+    elif result == 2:
         print('\033[33m'+minecraft.after.replace(b'\r',b'').decode()+'\033[m',end='')
-    elif result == 4:
+    elif result == 3:
         print(minecraft.after.replace(b'\r',b'').decode(),end='')
         minecraft.sendline('say Welcome, ' + minecraft.after.replace(b' joined the game\r\n',b'').decode())
-    elif result == 5:
+    elif result == 4:
         print(minecraft.after.replace(b'\r',b'').decode(),end='')
