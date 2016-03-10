@@ -45,7 +45,7 @@ def prepareGame():
     minecraft.sendline('gamerule logAdminCommands false')
     minecraft.sendline('time set 6000')
 
-#announceAll('{"text","This server is being controlled by the UHC wrapper","color","aqua"}')
+#announceAll('{"text":"This server is being controlled by the UHC wrapper","color":"aqua"}')
 
 def playerJoins(name,ip):
     announce(name,'{"text":"Welcome, ' + name + '","color":"gold"}')
