@@ -27,11 +27,13 @@ regexp = {}
 regexp['info'] = re.compile('^\[[0-9]+:[0-9]+:[0-9]+.*INFO\]: ')
 regexp['warn'] = re.compile('^\[[0-9]+:[0-9]+:[0-9]+.*WARN\]: ')
 # This lets us know that the server is up and ready
-regexp['done'] = re.compile('Done \([0-p].[0-9]+s\)! For help, type "help" or "?"')
+regexp['done'] = re.compile('^Done \([0-p].[0-9]+s\)! For help, type "help" or "?"')
 # This matches a player connecting to the server
-regexp['connect'] = re.compile('\w+\[/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+\] logged in')
+regexp['connect'] = re.compile('^\w+\[/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+\] logged in')
 # This matches a player diconnecting from the server
 regexp['disconnect'] = re.compile('\w+ lost connection: ')
+# A command typed by a player
+regexp['command'] = re.compile('^<\w+> !\w+')
 
 def announce(name,json_message):
     minecraft.sendline('tellraw ' + name + ' [' + uhcprefix + ','+json_message+']')
@@ -40,12 +42,10 @@ def announceAll(json_message):
     announce('@a',json_message)
 
 def prepareGame():
-    minecraft.sendline('gamerule doDaylightCycle false')
-    minecraft.sendline('gamerule commandBlockOutput false')
-    minecraft.sendline('gamerule logAdminCommands false')
-    minecraft.sendline('time set 6000')
-
-#announceAll('{"text":"This server is being controlled by the UHC wrapper","color":"aqua"}')
+    minecraft.sendline('gamerule doDaylightCycle false\n')
+    minecraft.sendline('gamerule commandBlockOutput false\n')
+    minecraft.sendline('gamerule logAdminCommands false\n')
+    minecraft.sendline('time set 6000\n')
 
 def playerJoins(name,ip):
     announce(name,'{"text":"Welcome, ' + name + '","color":"gold"}')
@@ -53,6 +53,10 @@ def playerJoins(name,ip):
 
 def playerLeaves(name):
     players.remove(name)
+
+def handleCommand(name,command,args):
+    announce(name,'{"text":"Command received: '+command+'","color":"gold"}')
+    announce(name,'{"text":"Arguments received: '+args+'","color":"gold"}')
 
 ######################
 # Action begins here #
@@ -110,9 +114,9 @@ while(running):
                     prefix=''
 
             # If the world/spawn was just prepared, then prepare it for UHC
-            m = regexp['done'].match(line)
-            if m != None:
-                prepareGame()
+            #m = regexp['done'].match(line)
+            #if m != None:
+            #    prepareGame()
 
             # Check if a player has logged in
             m = regexp['connect'].match(line)
@@ -127,6 +131,17 @@ while(running):
             if m != None:
                 name=m.group().split()[0]
                 playerLeaves(name)
+
+            # Look for a command
+            m = regexp['command'].match(line)
+            if m != None:
+                # First word, chop off the < and >
+                name = m.group().split()[0][1:-1]
+                # Everything right of the bang
+                command = m.group().split('!')[1]
+                # Any arguments
+                args = line.replace(m.group(),'').lstrip()
+                handleCommand(name,command,args)
 
             # Output the line, complete with prefix, for console watchers
             if len(line)>0:
