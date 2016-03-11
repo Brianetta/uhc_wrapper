@@ -1,0 +1,45 @@
+eternal:
+  mode: day
+  timebegin: 40
+minutemarker: 10
+ops:
+- Brianetta
+- Daniiiiii
+playersperteam: 3
+revealnames: 20
+teamnames:
+- Glossy Bears
+- Nosy Moles
+- Witty Salamanders
+- Overjoyed Donkeys
+- Wicked Buffalos
+- Proud Elephants
+- Unadvised Squirrels
+- True Shrews
+- Offbeat Gazelles
+- Elderly Antelopes
+- Incandescent Wolves
+- Cluttered Turtles
+- Rural Chimpanzees
+- Violent Koalas
+- Mammoth Sheep
+- Rotten Eagles
+- Flagrant Dogfishes
+- Premium Hamsters
+- Oceanic Turkeys
+- Kindly Stinkbugs
+- Jobless Lice
+- Puny Monkeys
+- Exuberant Lobsters
+- Puffy Mules
+- Long Jellyfishes
+- Irritating Walruses
+- Goofy Magpies
+- Kind Penguins
+worldborder:
+  duration: 40
+  finish: 160
+  start: 1520
+  timebegin: 40
+x: 0
+z: 0
