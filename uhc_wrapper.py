@@ -3,6 +3,7 @@
 # Copyright © Brian Ronald, 2016
 # Wrapper script for Minecraft server 1.9
 # Implements UHC game rules via console
+# Please excuse British spellings
 ######################
 
 import pexpect
@@ -10,6 +11,7 @@ import codecs
 import re
 import yaml
 import time
+import random
 
 # Name of server jar
 server_jar = 'minecraft_server.1.9.jar'
@@ -30,6 +32,8 @@ minuteMarker = int(config['minutemarker'])
 teamsize = int(config['playersperteam'])
 revealNames = int(config['revealnames'])
 
+spectators = set(config['ops']) # Default value only
+
 # Internal variables
 players = set()
 timeStart = None
@@ -37,6 +41,23 @@ targetTime = 0
 worldborderAnnounce = set()
 teams = {}
 playerteams = {}
+teamcolours = {
+    0:'red',
+    1:'blue',
+    2:'yellow',
+    3:'green',
+    4:'aqua',
+    5:'gold',
+    6:'light_purple',
+    7:'dark_red',
+    8:'dark_blue',
+    9:'dark_green',
+    10:'dark_aqua',
+    11:'dark_purple',
+    12:'gray',
+    13:'dark_grey',
+    14:'black'
+}
 
 ######################
 # Compile some regular expressions. Things we look for in the minecraft server output.
@@ -51,7 +72,7 @@ regexp['connect'] = re.compile('^\w+\[/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+\] l
 # This matches a player diconnecting from the server
 regexp['disconnect'] = re.compile('\w+ lost connection: ')
 # A command typed by a player
-regexp['command'] = re.compile('^<\w+> !\w+')
+regexp['command'] = re.compile('^<.+> !\w+')
 # The world border's current width
 regexp['border'] = re.compile('^World border is currently [0-9]+ blocks wide')
 
@@ -66,6 +87,83 @@ def announceGold(name,message):
 
 def announceAllGold(message):
     announceGold('@a',message)
+
+def destroyTeams():
+    # Scoreboard
+    for teamnumber in range(0,15):
+        minecraft.sendline('scoreboard teams remove '+str(teamnumber)+'\n')
+    # Internal
+    playerteams.clear()
+    teams.clear()
+
+def showTeams():
+    for team in teams:
+        minecraft.sendline('tellraw @a[team='+str(team)+'] ['+uhcprefix+',{"text":"Your team is '+teams[team]+'","color":"'+teamcolours[team]+'"}]\n')
+        minecraft.sendline('tellraw @a[team='+str(team)+'] ['+uhcprefix+',{"text":"Your team members are ","color":"gold"},{"selector":"@a[team='+str(team)+']"}]\n')
+
+def createTeams():
+    destroyTeams()
+    teampool = list(players - spectators)
+    if len(teampool) == 0:
+        announceAllGold('Cannot assign teams, because everybody is spectating')
+        return;
+    numberOfTeams = min(round((len(teampool) / 3)+0.5),15) # hard-coded max of 15 teams
+    teamnames = config['teamnames'].copy()
+    global teams
+    global playerteams
+    # Create actual teams
+    random.shuffle(teamnames)
+    for teamnumber in range(0,numberOfTeams):
+        if teamnumber < numberOfTeams: # teamnumber is indexed from zero
+            # Internal
+            teams[teamnumber] = teamnames.pop()
+            # Scoreboard
+            minecraft.sendline('scoreboard teams add '+str(teamnumber)+' '+teams[teamnumber]+'\n')
+            minecraft.sendline('scoreboard teams option '+str(teamnumber)+' color '+teamcolours[teamnumber]+'\n')
+            minecraft.sendline('scoreboard teams option '+str(teamnumber)+' nametagVisibility hideForOtherTeams\n')
+    # Randomly assign players to those teams
+    random.shuffle(teampool)
+    # Internal
+    while len(teampool) > 0:
+        for teamnumber in teams:
+            if len(teampool) > 0:
+                playerteams[teampool.pop()]=teamnumber
+    # Scoreboard
+    for player in playerteams:
+        minecraft.sendline('scoreboard teams join '+str(playerteams[player])+' '+player+'\n')
+    showTeams()
+
+def swapTeammember(player1,player2):
+    if set(playerteams.keys()) & {player1,player2} == {player1,player2}:
+        # Internal
+        playerteams[player1],playerteams[player2] = playerteams[2],playerteams[1]
+        # Scoreboard
+        minecraft.sendline('scoreboard teams leave '+player1+'\r')
+        minecraft.sendline('scoreboard teams leave '+player2+'\r')
+        minecraft.sendline('scoreboard teams join '+playerteams[player1]+' '+player1+'\r')
+        minecraft.sendline('scoreboard teams join '+playerteams[player2]+' '+player2+'\r')
+
+def spectate(name,args):
+    if args=='':
+        announceGold(name,'Toggle spectators by providing their names')
+    else:
+        for spectator in args.split():
+            if spectator in spectators:
+                spectators.remove(spectator)
+            else:
+                spectators.add(spectator)
+    spectatorOutput = list()
+    for spectator in spectators:
+        spectatorOutput.append(', ')
+        spectatorOutput.append(spectator)
+    spectatorOutput.pop(0)
+    if len(spectatorOutput) > 2:
+        spectatorOutput[1]=' and '
+    spectatorOutput.reverse()
+    output = ''
+    for w in spectatorOutput:
+        output = output + w
+    announceGold(name,'Spectators: '+output)
 
 def buildLobby():
     # Build a lobby
@@ -119,16 +217,15 @@ def beginGame():
     minecraft.sendline('fill '+str(x+1)+' 5 '+str(z+1)+' '+str(x+14)+' 6 '+str(z+14)+' minecraft:air\n')
     minecraft.sendline('fill '+str(x+1)+' 4 '+str(z+1)+' '+str(x+14)+' 4 '+str(z+14)+' minecraft:carpet\n')
     minecraft.sendline('fill '+str(x+1)+' 3 '+str(z+1)+' '+str(x+14)+' 3 '+str(z+14)+' minecraft:glowstone\n')
-    # Move players from the lobby
-    minecraft.sendline('tp @a '+str(x+8)+' 4 '+str(z+8))
+    # Move players from the lobby, clear their inventories
+    minecraft.sendline('tp @a '+str(x+8)+' 4 '+str(z+8)+'\n')
+    minecraft.sendline('clear @a\n')
     # Lose the lobby
     destroyLobby()
     # Decorate it
     minecraft.sendline('kill @e[tag=DeathRoom]')
-    minecraft.sendline('summon ArmorStand '+str(x+8)+' 3 '+str(z+8)+
-                       ' {Invisible:1,CustomName:"Death Room",CustomNameVisible:1,ArmorItems:[{},{},{},{id:redstone_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
-    minecraft.sendline('scoreboard players tag @e[type=ArmorStand,x='+str(x+8)+',y=3,z='+str(z+8)+
-                       ',c=1] add DeathRoom\n')
+    minecraft.sendline('summon ArmorStand '+str(x+8)+' 3 '+str(z+8)+' {Invisible:1,CustomName:"Death Room",CustomNameVisible:1,ArmorItems:[{},{},{},{id:redstone_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
+    minecraft.sendline('scoreboard players tag @e[type=ArmorStand,x='+str(x+8)+',y=3,z='+str(z+8)+',c=1] add DeathRoom\n')
     timeStart=time.time()
     # Scoreboard to control it all
     minecraft.sendline('scoreboard objectives add dead stat.deaths\n')
@@ -181,6 +278,9 @@ def opHelp():
     announce(name,'{"text":"!teamsize","color":"white"},{"text":" Set number of players per team","color":"gold"}')
     announce(name,'{"text":"!eternal","color":"white"},{"text":" Set eternal day/night/off (after minutes)","color":"gold"}')
     announce(name,'{"text":"!revealnames","color":"white"},{"text":" Set delay before players can see enemy name tags","color":"gold"}')
+    announce(name,'{"text":"!spectate","color":"white"},{"text":" View or toggle spectators","color":"gold"}')
+    announce(name,'{"text":"!teamup","color":"white"},{"text":" Generate and assign teams","color":"gold"}')
+    announce(name,'{"text":"!op","color":"white"},{"text":" Get op on server itself","color":"gold"}')
 
 def handleCommand(name,command,args):
     command = command.lower() # Make commands case insensitive
@@ -276,6 +376,18 @@ def handleCommand(name,command,args):
             announceGold(name,'World border final width (finish): '+str(config['worldborder']['finish']))
             announceGold(name,'Minutes until border moves (timebegin): '+str(config['worldborder']['timebegin']))
             announceGold(name,'Time taken in minutes to shrink (duration): '+str(config['worldborder']['duration']))
+        if command=='teamup':
+            createTeams()
+        if command=='spectate':
+            spectate(name,args)
+        if command=='op':
+            minecraft.sendline('op '+name+'\n')
+
+def fixName(name):
+    if name[0]=='§':
+        return name[2:-2]
+    else:
+        return name
 
 ######################
 # Action begins here #
@@ -286,6 +398,12 @@ minecraft = pexpect.spawn(commandline,timeout=None,encoding=None)
 running = minecraft.isalive()
 
 while(running):
+
+    # I'll mention it here. All my sendline() commands send an extra '\n' at the end. This is
+    # so that the command as typed by pexpect doesn't interfere with the pattern
+    # matching in this section, which is heavily dependent on line endings.
+    # This does result in one "Unknown command" per command, because Minecraft does not
+    # ignore empty commands. So, they're filtered after the regex matching, toward the end.
 
     # Read Minecraft console.
     result = minecraft.expect([
@@ -354,8 +472,8 @@ while(running):
             # Look for a command
             m = regexp['command'].match(line)
             if m != None:
-                # First word, chop off the < and >
-                name = m.group().split()[0][1:-1]
+                # First word, chop off the < and >, and run through the team colour stripper
+                name = fixName(m.group().split()[0][1:-1])
                 # Everything right of the bang
                 command = m.group().split('!')[1]
                 # Any arguments
@@ -370,7 +488,8 @@ while(running):
                 worldborderAnnounce.clear()
 
             # Output the line, complete with prefix, for console watchers
-            if len(line)>0:
+            if len(line)>0 and line != 'Unknown command. Try /help for a list of commands\n':
+                # Ignore the "Unknown command" warnings from our empty lines
                 if line[-1] == '\n':
                     print(prefix + line,end='')
                 else:
