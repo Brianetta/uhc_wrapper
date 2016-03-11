@@ -28,6 +28,7 @@ x = int(config['x'])
 z = int(config['z'])
 minuteMarker = int(config['minutemarker'])
 teamsize = int(config['playersperteam'])
+revealNames = int(config['revealnames'])
 
 # Internal variables
 players = set()
@@ -73,20 +74,21 @@ def buildLobby():
     minecraft.sendline('fill '+ str(x-8)+' 253 '+ str(z-8)+' '+ str(x+7)+' 255 '+ str(z+7)+' minecraft:air\n');
     minecraft.sendline('setblock '+str(x)+' 252 '+str(z)+' minecraft:end_portal_frame 4\n')
     minecraft.sendline('setblock '+str(x)+' 253 '+str(z)+' minecraft:stained_glass_pane 3\n')
+    minecraft.sendline('setworldspawn '+str(x)+' 253 '+str(z))
     # Decorate it and set the spawn
     minecraft.sendline('kill @e[tag=Origin]\n')
-    minecraft.sendline('summon ArmorStand '+str(x)+' 252 '+str(x)+' {Invisible:1,CustomName:"UHC Lobby",CustomNameVisible:1,HandItems:[{id:iron_sword},{id:iron_sword}],ArmorItems:[{},{},{},{id:diamond_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
+    minecraft.sendline('summon ArmorStand '+str(x)+' 252 '+str(z)+' {Invisible:1,CustomName:"UHC Lobby",CustomNameVisible:1,HandItems:[{id:iron_sword},{id:iron_sword}],ArmorItems:[{},{},{},{id:diamond_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
     minecraft.sendline('scoreboard players tag @e[type=ArmorStand,x='+str(x)+',y=252,z='+str(z)+',c=1] add Origin\n')
     minecraft.sendline('entitydata @e[tag=Origin] {Pose:{LeftArm:[0f,-90f,-60f],RightArm:[0f,90f,60f],Head:[0f,45f,0f]}}\n')
     # Build the command blocks
     minecraft.sendline('fill '+str(x)+' 0 '+str(z)+' '+str(x+15)+' 2 '+str(z+15)+' minecraft:bedrock\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"effect @a minecraft:regeneration 1 20 true"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a minecraft:saturation 1 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"effect @a minecraft:regeneration 5 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a minecraft:saturation 5 20 true"}\n')
     minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+3)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a minecraft:weakness 1 20 true"}\n')
     minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"tp @e[tag=Origin] ~ ~ ~ ~10 ~"}\n')
     minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"weather clear"}\n')
     # Put everybody in the lobby
-    minecraft.sendline('spreadplayers '+str(x)+' '+str(z)+' 0 8 true @a')
+    minecraft.sendline('spreadplayers '+str(x)+' '+str(z)+' 0 6 true @a')
     announceAllGold('Welcome to the Ultra Hardcore lobby')
 
 def destroyLobby():
@@ -103,6 +105,44 @@ def prepareGame():
     minecraft.sendline('gamerule naturalRegeneration false\n')
     minecraft.sendline('time set 6000\n')
     minecraft.sendline('worldborder center '+str(x)+' '+str(z)+'\n')
+    # Create basic objective
+    minecraft.sendline('scoreboard objectives add health health\n')
+    minecraft.sendline('scoreboard objectives setdisplay list health\n')
+    # Clear in-play objectives
+    minecraft.sendline('scoreboard objectives remove dead\n')
+    minecraft.sendline('scoreboard objectives remove indeathroom\n')
+
+
+def beginGame():
+    # Create a room for dead players
+    minecraft.sendline('fill '+str(x)+' 3 '+str(z)+' '+str(x+15)+' 7 '+str(z+15)+' minecraft:bedrock\n')
+    minecraft.sendline('fill '+str(x+1)+' 5 '+str(z+1)+' '+str(x+14)+' 6 '+str(z+14)+' minecraft:air\n')
+    minecraft.sendline('fill '+str(x+1)+' 4 '+str(z+1)+' '+str(x+14)+' 4 '+str(z+14)+' minecraft:carpet\n')
+    minecraft.sendline('fill '+str(x+1)+' 3 '+str(z+1)+' '+str(x+14)+' 3 '+str(z+14)+' minecraft:glowstone\n')
+    # Move players from the lobby
+    minecraft.sendline('tp @a '+str(x+8)+' 4 '+str(z+8))
+    # Lose the lobby
+    destroyLobby()
+    # Decorate it
+    minecraft.sendline('kill @e[tag=DeathRoom]')
+    minecraft.sendline('summon ArmorStand '+str(x+8)+' 3 '+str(z+8)+
+                       ' {Invisible:1,CustomName:"Death Room",CustomNameVisible:1,ArmorItems:[{},{},{},{id:redstone_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
+    minecraft.sendline('scoreboard players tag @e[type=ArmorStand,x='+str(x+8)+',y=3,z='+str(z+8)+
+                       ',c=1] add DeathRoom\n')
+    timeStart=time.time()
+    # Scoreboard to control it all
+    minecraft.sendline('scoreboard objectives add dead stat.deaths\n')
+    minecraft.sendline('scoreboard objectives add indeathroom dummy\n')
+    # Blocks to update the scoreboards
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"scoreboard players set @a indeathroom 0"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"scoreboard players set @a[x='+str(x+1)+',y=4,z='+str(z+1)+',dx=14,dy=3,dz=14] indeathroom 1"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+3)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"tp @a[score_indeathroom=0,score_dead_min=1] '+str(x+8)+' 4 '+str(z+8)+'"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+4)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:regeneration 5 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+5)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:saturation 5 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+6)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:weakness 1 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+7)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"gamemode 2 @a[score_dead_min=1,m=!2]"}\n')
+    minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"tp @e[tag=DeathRoom] ~ ~ ~ ~5 ~"}\n')
+    minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"execute @e[tag=DeathRoom] ~ ~1 ~ spawnpoint @a"}\n')
 
 def playerJoins(name,ip):
     announceGold(name,'Welcome, ' + name + '. For UHC command help, say !help in chat.')
@@ -116,6 +156,7 @@ def saveConfig(name):
     config['z'] = z
     config['minutemarker'] = minuteMarker
     config['playersperteam'] = teamsize
+    config['revealnames'] = revealNames
     handle = open(configfile,'w')
     handle.write(yaml.dump(config,default_flow_style=False))
     handle.close()
@@ -130,6 +171,7 @@ def nonOpHelp():
 
 def opHelp():
     # Continuation of non-op, but for staff/hosts
+    announce(name,'{"text":"!border","color":"white"},{"text":" (admin) set start, finish, timebegin, duration","color":"gold"}')
     announce(name,'{"text":"!buildlobby","color":"white"},{"text":" Build and initialise the lobby","color":"gold"}')
     announce(name,'{"text":"!destroylobby","color":"white"},{"text":" Destroy and de-activate the lobby","color":"gold"}')
     announce(name,'{"text":"!x","color":"white"},{"text":" Set X coordinate of map centre","color":"gold"}')
@@ -138,7 +180,7 @@ def opHelp():
     announce(name,'{"text":"!minutes","color":"white"},{"text":" Set the time between minute markers","color":"gold"}')
     announce(name,'{"text":"!teamsize","color":"white"},{"text":" Set number of players per team","color":"gold"}')
     announce(name,'{"text":"!eternal","color":"white"},{"text":" Set eternal day/night/off (after minutes)","color":"gold"}')
-    #announce(name,'{"text":"!","color":"white"},{"text":" ","color":"gold"}')
+    announce(name,'{"text":"!revealnames","color":"white"},{"text":" Set delay before players can see enemy name tags","color":"gold"}')
 
 def handleCommand(name,command,args):
     command = command.lower() # Make commands case insensitive
@@ -183,16 +225,17 @@ def handleCommand(name,command,args):
             if args.isnumeric():
                 global minuteMarker
                 minuteMarker = int(args)
-                announceGold(name,'Minute marker set to every '+str(minuteMarker)+' minutes')
-            else:
-                announceGold(name,'Minute marker is currently every '+str(minuteMarker)+' minutes')
+            announceGold(name,'Minute marker set to every '+str(minuteMarker)+' minutes')
+        if command=='revealnames':
+            if args.isnumeric():
+                global revealNames
+                revealnames = int(args)
+            announceGold(name,'Enemy name tags visible after '+str(revealNames)+' minutes')
         if command=='teamsize':
             if args.isnumeric():
                 global teamsize
                 teamsize = int(args)
-                announceGold(name,'Auto-assigned teams will have '+str(teamsize)+' players')
-            else:
-                announceGold(name,'Team size is set to '+str(teamsize)+' players')
+            announceGold(name,'Team size is set to '+str(teamsize)+' players')
         if command=='eternal':
             subc,suba='',''
             if args!='':
@@ -217,6 +260,22 @@ def handleCommand(name,command,args):
                 announceGold(name,'This takes place after ' + str(config['eternal']['timebegin']) + ' minutes')
         if command=='save':
             saveConfig(name)
+        if command=='begin':
+            beginGame()
+        if command=='border' and timeStart==None:
+            subc,suba='',''
+            if args!='':
+                subc = args.split()[0]
+                if args != subc:
+                    suba = args.split()[1]
+            if subc in {'duration','finish','start','timebegin'}:
+                global config
+                if suba.isnumeric():
+                    config['worldborder'][subc] = int(suba)
+            announceGold(name,'World border starting width (start): '+str(config['worldborder']['start']))
+            announceGold(name,'World border final width (finish): '+str(config['worldborder']['finish']))
+            announceGold(name,'Minutes until border moves (timebegin): '+str(config['worldborder']['timebegin']))
+            announceGold(name,'Time taken in minutes to shrink (duration): '+str(config['worldborder']['duration']))
 
 ######################
 # Action begins here #
