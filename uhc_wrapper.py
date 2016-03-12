@@ -21,6 +21,7 @@ configfile = 'uhc_wrapper.yml'
 
 # Command line builder
 commandline = 'java -jar ' + server_jar + ' nogui'
+commandline = 'tmux -u a'
 
 uhcprefix = '{"text":"[UHC] ","color":"yellow"}'
 
@@ -75,6 +76,8 @@ regexp['disconnect'] = re.compile('\w+ lost connection: ')
 regexp['command'] = re.compile('^<.+> !\w+')
 # The world border's current width
 regexp['border'] = re.compile('^World border is currently [0-9]+ blocks wide')
+# For technical reasons...
+regexp['unknown'] = re.compile('^Unknown command. Try /help for a list of commands')
 
 def announce(name,json_message):
     minecraft.sendline('tellraw ' + name + ' [' + uhcprefix + ','+json_message+']')
@@ -95,6 +98,14 @@ def destroyTeams():
     # Internal
     playerteams.clear()
     teams.clear()
+
+def showTeam(name):
+    if name in playerteams:
+        team = playerteams[name]
+        minecraft.sendline('tellraw '+name+' ['+uhcprefix+',{"text":"Your team is '+teams[team]+'","color":"'+teamcolours[team]+'"}]\n')
+        minecraft.sendline('tellraw '+name+' ['+uhcprefix+',{"text":"Your team members are ","color":"gold"},{"selector":"@a[team='+str(team)+']"}]\n')
+    else:
+        announceGold(name,'You have not yet been assigned to a team')
 
 def showTeams():
     for team in teams:
@@ -145,13 +156,17 @@ def swapTeammember(player1,player2):
 
 def spectate(name,args):
     if args=='':
-        announceGold(name,'Toggle spectators by providing their names')
+        announceGold(name,'Toggle spectators by providing their names (case sensitive)')
     else:
         for spectator in args.split():
             if spectator in spectators:
                 spectators.remove(spectator)
+                if timeStart != None:
+                    minecraft.sendline('scoreboard players set '+spectator+' spectating 0')
             else:
                 spectators.add(spectator)
+                if timeStart != None:
+                    minecraft.sendline('scoreboard players set '+spectator+' spectating 1')
     spectatorOutput = list()
     for spectator in spectators:
         spectatorOutput.append(', ')
@@ -203,13 +218,14 @@ def prepareGame():
     minecraft.sendline('gamerule naturalRegeneration false\n')
     minecraft.sendline('time set 6000\n')
     minecraft.sendline('worldborder center '+str(x)+' '+str(z)+'\n')
+    # Clear in-play objectives
+    minecraft.sendline('scoreboard objectives remove dead\n')
+    minecraft.sendline('scoreboard objectives remove spectating\n')
+    minecraft.sendline('scoreboard objectives remove indeathroom\n')
     # Create basic objective
     minecraft.sendline('scoreboard objectives add health health\n')
     minecraft.sendline('scoreboard objectives setdisplay list health\n')
-    # Clear in-play objectives
-    minecraft.sendline('scoreboard objectives remove dead\n')
-    minecraft.sendline('scoreboard objectives remove indeathroom\n')
-
+    minecraft.sendline('scoreboard objectives add spectating dummy\n')
 
 def beginGame():
     # Create a room for dead players
@@ -229,17 +245,30 @@ def beginGame():
     timeStart=time.time()
     # Scoreboard to control it all
     minecraft.sendline('scoreboard objectives add dead stat.deaths\n')
+    minecraft.sendline('scoreboard objectives add deadannounced stat.deaths\n')
     minecraft.sendline('scoreboard objectives add indeathroom dummy\n')
     # Blocks to update the scoreboards
     minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"scoreboard players set @a indeathroom 0"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"scoreboard players set @a[x='+str(x+1)+',y=4,z='+str(z+1)+',dx=14,dy=3,dz=14] indeathroom 1"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+3)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"tp @a[score_indeathroom=0,score_dead_min=1] '+str(x+8)+' 4 '+str(z+8)+'"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+4)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:regeneration 5 20 true"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+5)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:saturation 5 20 true"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+6)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:weakness 1 20 true"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+7)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"gamemode 2 @a[score_dead_min=1,m=!2]"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"execute @e[type=Player,score_dead_min=1,score_deadannounced=0] ~ ~ ~ say dead"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+3)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"scoreboard players set @e[type=Player,score_dead_min=1,score_deadannounced=0] deadannounced 1"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+4)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"scoreboard players set @e[type=Player,x='+str(x+1)+',y=4,z='+str(z+1)+',dx=14,dy=3,dz=14] indeathroom 1"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+5)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"tp @e[type=Player,score_indeathroom=0,score_dead_min=1] '+str(x+8)+' 4 '+str(z+8)+'"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+6)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:regeneration 5 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+7)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:saturation 5 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+8)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:weakness 1 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+9)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"gamemode 2 @a[score_dead_min=1,m=!2]"}\n')
     minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"tp @e[tag=DeathRoom] ~ ~ ~ ~5 ~"}\n')
-    minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"execute @e[tag=DeathRoom] ~ ~1 ~ spawnpoint @a"}\n')
+    minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"execute @e[tag=DeathRoom] ~ ~ ~ spawnpoint @a ~ ~1 ~"}\n')
+    minecraft.sendline('setblock '+str(x+5)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"effect @a[score_spectating_min=1] minecraft:night_vision 20 20 true"}\n')
+    minecraft.sendline('scoreboard players set @a spectating 0\n')
+    minecraft.sendline('scoreboard players set @a deadannounced 0\n')
+    for spectator in players & spectators:
+        minecraft.sendline('scoreboard players set '+spectator+' spectating 1\n')
+    minecraft.sendline('spreadplayers '+str(x)+' '+str(z)+' '+str(int(config['worldborder']['start']-1)*0.8)+' '+str(config['worldborder']['start']-1)+' true @a[score_spectating=0]\n')
+    minecraft.sendline('gamemode 0 @a[score_spectating=0]\n')
+    minecraft.sendline('gamemode 3 @a[score_spectating_min=1]\n')
+    minecraft.sendline('tp @a[score_spectating_min=1] ~ 253 ~\n')
+    announceAll('{"text":"The game has begun!","color":"green"}')
 
 def playerJoins(name,ip):
     announceGold(name,'Welcome, ' + name + '. For UHC command help, say !help in chat.')
@@ -264,6 +293,7 @@ def nonOpHelp():
     announce(name,'{"text":"!help","color":"white"},{"text":" Show this help","color":"gold"}')
     announce(name,'{"text":"!utc","color":"white"},{"text":" Show current time (UTC)","color":"gold"}')
     announce(name,'{"text":"!time","color":"white"},{"text":" Show elapsed game time","color":"gold"}')
+    announce(name,'{"text":"!team","color":"white"},{"text":" Show your team information","color":"gold"}')
     announce(name,'{"text":"!border","color":"white"},{"text":" Show the world border width","color":"gold"}')
 
 def opHelp():
@@ -280,6 +310,7 @@ def opHelp():
     announce(name,'{"text":"!revealnames","color":"white"},{"text":" Set delay before players can see enemy name tags","color":"gold"}')
     announce(name,'{"text":"!spectate","color":"white"},{"text":" View or toggle spectators","color":"gold"}')
     announce(name,'{"text":"!teamup","color":"white"},{"text":" Generate and assign teams","color":"gold"}')
+    announce(name,'{"text":"!begin","color":"white"},{"text":" Start the game","color":"gold"}')
     announce(name,'{"text":"!op","color":"white"},{"text":" Get op on server itself","color":"gold"}')
 
 def handleCommand(name,command,args):
@@ -293,6 +324,8 @@ def handleCommand(name,command,args):
             announceGold(name,'Game has not started yet')
         else:
             announceGold(name,'Elapsed time: ' + str(int((time.time() - timeStart)/60)) + ' minutes')
+    if command=='team':
+        showTeam(name)
     if command=='border':
         worldborderAnnounce.add(name)
         minecraft.sendline('worldborder get\n')
@@ -394,7 +427,7 @@ def fixName(name):
 ######################
 
 # Spawn the server
-minecraft = pexpect.spawn(commandline,timeout=None,encoding=None)
+minecraft = pexpect.spawn(commandline,timeout=None,encoding=None,env={"TERM": "linux"})
 running = minecraft.isalive()
 
 while(running):
@@ -488,7 +521,7 @@ while(running):
                 worldborderAnnounce.clear()
 
             # Output the line, complete with prefix, for console watchers
-            if len(line)>0 and line != 'Unknown command. Try /help for a list of commands\n':
+            if len(line)>0 and regexp['unknown'].match(line) == None:
                 # Ignore the "Unknown command" warnings from our empty lines
                 if line[-1] == '\n':
                     print(prefix + line,end='')
