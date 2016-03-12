@@ -14,7 +14,7 @@ import time
 import random
 
 # Name of server jar
-server_jar = 'minecraft_server.1.9.jar'
+server_jar = 'spigot-1.9.jar'
 
 # Config file
 configfile = 'uhc_wrapper.yml'
@@ -66,8 +66,8 @@ flag_eternal=True;
 # Compile some regular expressions. Things we look for in the minecraft server output.
 regexp = {}
 # Just to add colour, and so that we can strip them out.
-regexp['info'] = re.compile('^\[[0-9]+:[0-9]+:[0-9]+.*INFO\]: ')
-regexp['warn'] = re.compile('^\[[0-9]+:[0-9]+:[0-9]+.*WARN\]: ')
+regexp['info'] = re.compile('^>*\[[0-9]+:[0-9]+:[0-9]+.*INFO\]: ')
+regexp['warn'] = re.compile('^>*\[[0-9]+:[0-9]+:[0-9]+.*WARN\]: ')
 # This lets us know that the server is up and ready
 regexp['done'] = re.compile('^Done \([0-p].[0-9]+s\)! For help, type "help" or "?"')
 # This matches a player connecting to the server
@@ -345,6 +345,8 @@ def death(name):
 
 def playerJoins(name,ip):
     announceGold(name,'Welcome, ' + name + '. For UHC command help, say !help in chat.')
+    if name not in players | spectators and timeStart != None:
+        minecraft.sendline('scoreboard players set '+name+' dead 1\n')
     players.add(name)
 
 def playerLeaves(name):
@@ -626,7 +628,7 @@ while(running):
         if targetTime < timeStart:
             targetTime = timeStart + minuteMarker * 60
         if t > targetTime:
-            minecraft.sendline('playsound minecraft:entity.firework.launch ambient @a\n')
+            minecraft.sendline('execute @a ~ ~ ~ playsound minecraft:entity.firework.launch ambient @a[c=1]\n')
             announceAllGold('Minute marker: '+ str(minutesElapsed)+' minutes')
             targetTime = targetTime + minuteMarker * 60
         # Make nametags visible
