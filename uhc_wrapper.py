@@ -21,7 +21,6 @@ configfile = 'uhc_wrapper.yml'
 
 # Command line builder
 commandline = 'java -jar ' + server_jar + ' nogui'
-commandline = 'tmux -u a'
 
 uhcprefix = '{"text":"[UHC] ","color":"yellow"}'
 
@@ -59,6 +58,9 @@ teamcolours = {
     13:'dark_grey',
     14:'black'
 }
+flag_border=True;
+flag_visibility=True;
+flag_eternal=True;
 
 ######################
 # Compile some regular expressions. Things we look for in the minecraft server output.
@@ -78,6 +80,52 @@ regexp['command'] = re.compile('^<.+> !\w+')
 regexp['border'] = re.compile('^World border is currently [0-9]+ blocks wide')
 # For technical reasons...
 regexp['unknown'] = re.compile('^Unknown command. Try /help for a list of commands')
+# Death messages. Why can't this be simple?
+regexp['death'] = re.compile('.+ was shot by arrow|'+
+'.+ was shot by .+|'+
+'.+ was shot by .+ using .+|'+
+'.+ was pricked to death|'+
+'.+ walked into a cactus while trying to escape .+|'+
+'.+ was stabbed to death|'+
+'.+ drowned|'+
+'.+ drowned whilst trying to escape .+|'+
+'.+ experienced kinetic energy|'+
+'.+ blew up|'+
+'.+ was blown up by .+|'+
+'.+ hit the ground too hard|'+
+'.+ fell from a high place|'+
+'.+ fell off a ladder|'+
+'.+ fell off some vines|'+
+'.+ fell out of the water|'+
+'.+ fell into a patch of fire|'+
+'.+ fell into a patch of cacti|'+
+'.+ was doomed to fall by .+|'+
+'.+ was shot off some vines by .+|'+
+'.+ was shot off a ladder by .+|'+
+'.+ was blown from a high place by .+|'+
+'.+ was squashed by a falling anvil|'+
+'.+ was squashed by a falling block|'+
+'.+ went up in flames|'+
+'.+ burned to death|'+
+'.+ was burnt to a crisp whilst fighting .+|'+
+'.+ walked into a fire whilst fighting .+|'+
+'.+ tried to swim in lava|'+
+'.+ tried to swim in lava while trying to escape .+|'+
+'.+ was struck by lightning|'+
+'.+ was slain by .+|'+
+'.+ was slain by .+ using .+|'+
+'.+ got finished off by .+|'+
+'.+ got finished off by .+ using .+|'+
+'.+ was fireballed by .+|'+
+'.+ was killed by magic|'+
+'.+ was killed by .+ using magic|'+
+'.+ starved to death|'+
+'.+ suffocated in a wall|'+
+'.+ was killed while trying to hurt .+|'+
+'.+ fell out of the world|'+
+'.+ fell from a high place and fell out of the world|'+
+'.+ withered away|'+
+'.+ was pummeled by .+')
 
 def announce(name,json_message):
     minecraft.sendline('tellraw ' + name + ' [' + uhcprefix + ','+json_message+']')
@@ -118,7 +166,7 @@ def createTeams():
     if len(teampool) == 0:
         announceAllGold('Cannot assign teams, because everybody is spectating')
         return;
-    numberOfTeams = min(round((len(teampool) / 3)+0.5),15) # hard-coded max of 15 teams
+    numberOfTeams = min(round((len(teampool) / teamsize)+0.5),15) # hard-coded max of 15 teams
     teamnames = config['teamnames'].copy()
     global teams
     global playerteams
@@ -144,15 +192,15 @@ def createTeams():
         minecraft.sendline('scoreboard teams join '+str(playerteams[player])+' '+player+'\n')
     showTeams()
 
-def swapTeammember(player1,player2):
+def swapTeamMember(player1,player2):
     if set(playerteams.keys()) & {player1,player2} == {player1,player2}:
         # Internal
-        playerteams[player1],playerteams[player2] = playerteams[2],playerteams[1]
+        playerteams[player1],playerteams[player2] = playerteams[player2],playerteams[player1]
         # Scoreboard
         minecraft.sendline('scoreboard teams leave '+player1+'\r')
         minecraft.sendline('scoreboard teams leave '+player2+'\r')
-        minecraft.sendline('scoreboard teams join '+playerteams[player1]+' '+player1+'\r')
-        minecraft.sendline('scoreboard teams join '+playerteams[player2]+' '+player2+'\r')
+        minecraft.sendline('scoreboard teams join '+str(playerteams[player1])+' '+player1+'\r')
+        minecraft.sendline('scoreboard teams join '+str(playerteams[player2])+' '+player2+'\r')
 
 def spectate(name,args):
     if args=='':
@@ -208,7 +256,6 @@ def destroyLobby():
     minecraft.sendline('kill @e[tag=Origin]\n')
     minecraft.sendline('fill '+ str(x-9)+' 251 '+ str(z-9)+' '+ str(x+8)+' 255 '+ str(z+8)+' minecraft:air\n')
     minecraft.sendline('fill '+str(x)+' 0 '+str(z)+' '+str(x+15)+' 2 '+str(z+15)+' minecraft:bedrock\n')
-    announceAllGold('Lobby has been removed.')
 
 def prepareGame():
     # Set some game rules
@@ -242,33 +289,59 @@ def beginGame():
     minecraft.sendline('kill @e[tag=DeathRoom]')
     minecraft.sendline('summon ArmorStand '+str(x+8)+' 3 '+str(z+8)+' {Invisible:1,CustomName:"Death Room",CustomNameVisible:1,ArmorItems:[{},{},{},{id:redstone_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
     minecraft.sendline('scoreboard players tag @e[type=ArmorStand,x='+str(x+8)+',y=3,z='+str(z+8)+',c=1] add DeathRoom\n')
+    global timeStart
     timeStart=time.time()
     # Scoreboard to control it all
     minecraft.sendline('scoreboard objectives add dead stat.deaths\n')
-    minecraft.sendline('scoreboard objectives add deadannounced stat.deaths\n')
     minecraft.sendline('scoreboard objectives add indeathroom dummy\n')
     # Blocks to update the scoreboards
     minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"scoreboard players set @a indeathroom 0"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"execute @e[type=Player,score_dead_min=1,score_deadannounced=0] ~ ~ ~ say dead"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+3)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"scoreboard players set @e[type=Player,score_dead_min=1,score_deadannounced=0] deadannounced 1"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+4)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"scoreboard players set @e[type=Player,x='+str(x+1)+',y=4,z='+str(z+1)+',dx=14,dy=3,dz=14] indeathroom 1"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+5)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"tp @e[type=Player,score_indeathroom=0,score_dead_min=1] '+str(x+8)+' 4 '+str(z+8)+'"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+6)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:regeneration 5 20 true"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+7)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:saturation 5 20 true"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+8)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:weakness 1 20 true"}\n')
-    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+9)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"gamemode 2 @a[score_dead_min=1,m=!2]"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"scoreboard players set @e[type=Player,x='+str(x+1)+',y=4,z='+str(z+1)+',dx=14,dy=3,dz=14] indeathroom 1"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+3)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"tp @e[type=Player,score_indeathroom=0,score_dead_min=1] '+str(x+8)+' 4 '+str(z+8)+'"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+4)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:regeneration 5 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+5)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:saturation 5 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+6)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"effect @a[score_indeathroom_min=1] minecraft:weakness 1 20 true"}\n')
+    minecraft.sendline('setblock '+str(x+1)+' 1 '+str(z+7)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"gamemode 2 @a[score_dead_min=1,m=!2]"}\n')
     minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"tp @e[tag=DeathRoom] ~ ~ ~ ~5 ~"}\n')
     minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"execute @e[tag=DeathRoom] ~ ~ ~ spawnpoint @a ~ ~1 ~"}\n')
     minecraft.sendline('setblock '+str(x+5)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"effect @a[score_spectating_min=1] minecraft:night_vision 20 20 true"}\n')
+    # Set the border
+    minecraft.send('worldborder set '+str(config['worldborder']['start'])+'\n')
+    # Deal with spectators
     minecraft.sendline('scoreboard players set @a spectating 0\n')
-    minecraft.sendline('scoreboard players set @a deadannounced 0\n')
     for spectator in players & spectators:
         minecraft.sendline('scoreboard players set '+spectator+' spectating 1\n')
-    minecraft.sendline('spreadplayers '+str(x)+' '+str(z)+' '+str(int(config['worldborder']['start']-1)*0.8)+' '+str(config['worldborder']['start']-1)+' true @a[score_spectating=0]\n')
+    # Spread the players
+    minecraft.sendline('spreadplayers '+str(x)+' '+str(z)+' '+str(int(config['worldborder']['start']-1)*0.4)+' '+str(int(config['worldborder']['start']-1)/2)+' true @a[score_spectating=0]\n')
+    # Start the sun
+    minecraft.sendline('gamerule doDaylightCycle true\n')
+    # Set the appropriate game modes
     minecraft.sendline('gamemode 0 @a[score_spectating=0]\n')
     minecraft.sendline('gamemode 3 @a[score_spectating_min=1]\n')
-    minecraft.sendline('tp @a[score_spectating_min=1] ~ 253 ~\n')
+    minecraft.sendline('tp @a[score_spectating_min=1] ~ 200 ~\n')
     announceAll('{"text":"The game has begun!","color":"green"}')
+
+def victorious(team):
+    destroyLobby()
+    minecraft.sendline('gamemode 3 @a[m=2]\n')
+    minecraft.sendline('title @a subtitle {"text":"'+teams[team]+' have won","color":"'+teamcolours[team]+'"}\n')
+    minecraft.sendline('title @a title {"text":"Victorious!","color":"gold"}\n')
+    announceAll('{"text":"'+teams[team]+' have won UHC","color":"'+teamcolours[team]+'"}')
+    minecraft.sendline('tellraw @a [{"text":"Congratulations to ","color":"gold"},{"selector":"@a[team='+str(team)+']"}]\n')
+
+def death(name):
+    team = playerteams.pop(name,None)
+    if team == None:
+        return
+    survivors = 0
+    for member in playerteams:
+        if playerteams[member]==team:
+            survivors = survivors + 1
+    if survivors == 0:
+        announceAll('{"text":"'+teams[team]+'" have been eliminated","color":"'+teamcolours[team]+'"}')
+    if len(set(playerteams.values())) == 1:
+        for player in playerteams:
+            victorious(playerteams[player])
 
 def playerJoins(name,ip):
     announceGold(name,'Welcome, ' + name + '. For UHC command help, say !help in chat.')
@@ -309,6 +382,7 @@ def opHelp():
     announce(name,'{"text":"!eternal","color":"white"},{"text":" Set eternal day/night/off (after minutes)","color":"gold"}')
     announce(name,'{"text":"!revealnames","color":"white"},{"text":" Set delay before players can see enemy name tags","color":"gold"}')
     announce(name,'{"text":"!spectate","color":"white"},{"text":" View or toggle spectators","color":"gold"}')
+    announce(name,'{"text":"!teamswap","color":"white"},{"text":" Swap two players between teams","color":"gold"}')
     announce(name,'{"text":"!teamup","color":"white"},{"text":" Generate and assign teams","color":"gold"}')
     announce(name,'{"text":"!begin","color":"white"},{"text":" Start the game","color":"gold"}')
     announce(name,'{"text":"!op","color":"white"},{"text":" Get op on server itself","color":"gold"}')
@@ -362,7 +436,7 @@ def handleCommand(name,command,args):
         if command=='revealnames':
             if args.isnumeric():
                 global revealNames
-                revealnames = int(args)
+                revealNames = int(args)
             announceGold(name,'Enemy name tags visible after '+str(revealNames)+' minutes')
         if command=='teamsize':
             if args.isnumeric():
@@ -411,6 +485,17 @@ def handleCommand(name,command,args):
             announceGold(name,'Time taken in minutes to shrink (duration): '+str(config['worldborder']['duration']))
         if command=='teamup':
             createTeams()
+        if command=='teamswap':
+            if args != '':
+                player1 = args.split()[0]
+                if args != player1:
+                    player2 = args.split()[1]
+                    swapTeamMember(player1,player2)
+                    announceGold(name,'Swapped '+player1+' and '+player2)
+                else:
+                    announceGold(name,'!teamswap player1 player2')
+            else:
+                announceGold(name,'!teamswap player1 player2')
         if command=='spectate':
             spectate(name,args)
         if command=='op':
@@ -427,7 +512,7 @@ def fixName(name):
 ######################
 
 # Spawn the server
-minecraft = pexpect.spawn(commandline,timeout=None,encoding=None,env={"TERM": "linux"})
+minecraft = pexpect.spawn(commandline,timeout=None,encoding=None)
 running = minecraft.isalive()
 
 while(running):
@@ -520,6 +605,11 @@ while(running):
                     announceGold(name,line)
                 worldborderAnnounce.clear()
 
+            # Look for player deaths
+            m = regexp['death'].match(line)
+            if m!=None:
+                death(fixName(m.group().split()[0]))
+
             # Output the line, complete with prefix, for console watchers
             if len(line)>0 and regexp['unknown'].match(line) == None:
                 # Ignore the "Unknown command" warnings from our empty lines
@@ -528,13 +618,36 @@ while(running):
                 else:
                     print(prefix + line,end='\n')
 
+    # Scheduled tasks!
     if timeStart != None:
-        # Show the minute marker
         t = time.time()
+        minutesElapsed = int((t - timeStart)/60)
+        # Show the minute marker
         if targetTime < timeStart:
             targetTime = timeStart + minuteMarker * 60
         if t > targetTime:
-            minutesElapsed = int((t - timeStart)/60)
-            minecraft.sendline('playsound minecraft:entity.firework.launch ambient Brianetta\n')
+            minecraft.sendline('playsound minecraft:entity.firework.launch ambient @a\n')
             announceAllGold('Minute marker: '+ str(minutesElapsed)+' minutes')
             targetTime = targetTime + minuteMarker * 60
+        # Make nametags visible
+        if flag_visibility and minutesElapsed >= config['revealnames']:
+            for team in playerteams:
+                minecraft.sendline('scoreboard teams option '+str(playerteams[team])+' nametagVisibility always\n')
+            announceAllGold('Your nametags are now visible to the enemy.')
+            flag_visibility = False
+        # Eternal day/night
+        if flag_eternal and minutesElapsed >= config['eternal']['timebegin']:
+            if config['eternal']['mode'] == 'day':
+                minecraft.sendline('gamerule doDaylightCycle false\n')
+                minecraft.sendline('time set 6000\n')
+                announceAllGold('Eternal day has begun.')
+            if config['eternal']['mode'] == 'night':
+                minecraft.sendline('gamerule doDaylightCycle false\n')
+                minecraft.sendline('time set 18000\n')
+                announceAllGold('Eternal night has begun.')
+            flag_eternal = False
+        # Worldborder
+        if flag_border and minutesElapsed >= config['worldborder']['timebegin']:
+            minecraft.send('worldborder set '+str(config['worldborder']['finish'])+' '+str(config['worldborder']['duration']*60)+'\n')
+            announceAllGold('The world border has started shrinking.')
+            flag_border=False
