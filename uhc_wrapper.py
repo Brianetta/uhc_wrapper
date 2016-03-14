@@ -80,6 +80,8 @@ regexp['command'] = re.compile('^<.+> !\w+')
 regexp['border'] = re.compile('^World border is currently [0-9]+ blocks wide')
 # For technical reasons...
 regexp['unknown'] = re.compile('^Unknown command. Try /help for a list of commands')
+# List of players
+regexp['playerlist'] = re.compile('^(\w+, )*(\w+)')
 # Death messages. Why can't this be simple?
 regexp['death'] = re.compile('.+ was shot by arrow|'+
 '.+ was shot by .+|'+
@@ -238,7 +240,7 @@ def buildLobby():
     minecraft.sendline('setworldspawn '+str(x)+' 253 '+str(z))
     # Decorate it and set the spawn
     minecraft.sendline('kill @e[tag=Origin]\n')
-    minecraft.sendline('summon ArmorStand '+str(x)+' 252 '+str(z)+' {Invisible:1,CustomName:"UHC Lobby",CustomNameVisible:1,HandItems:[{id:iron_sword},{id:iron_sword}],ArmorItems:[{},{},{},{id:diamond_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
+    minecraft.sendline('summon ArmorStand '+str(x)+' 252 '+str(z)+' {DisabledSlots:2039567,Invisible:1,CustomName:"UHC Lobby",CustomNameVisible:1,HandItems:[{id:iron_sword},{id:iron_sword}],ArmorItems:[{},{},{},{id:diamond_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
     minecraft.sendline('scoreboard players tag @e[type=ArmorStand,x='+str(x)+',y=252,z='+str(z)+',c=1] add Origin\n')
     minecraft.sendline('entitydata @e[tag=Origin] {Pose:{LeftArm:[0f,-90f,-60f],RightArm:[0f,90f,60f],Head:[0f,45f,0f]}}\n')
     # Build the command blocks
@@ -287,7 +289,7 @@ def beginGame():
     destroyLobby()
     # Decorate it
     minecraft.sendline('kill @e[tag=DeathRoom]')
-    minecraft.sendline('summon ArmorStand '+str(x+8)+' 3 '+str(z+8)+' {Invisible:1,CustomName:"Death Room",CustomNameVisible:1,ArmorItems:[{},{},{},{id:redstone_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
+    minecraft.sendline('summon ArmorStand '+str(x+8)+' 3 '+str(z+8)+' {DisabledSlots:2039567,Invisible:1,CustomName:"Death Room",CustomNameVisible:1,ArmorItems:[{},{},{},{id:redstone_block,Count:1,tag:{ench:[{id:0,lvl:1}]}}],CustomNameVisible:1,Invulnerable:1}\n')
     minecraft.sendline('scoreboard players tag @e[type=ArmorStand,x='+str(x+8)+',y=3,z='+str(z+8)+',c=1] add DeathRoom\n')
     global timeStart
     timeStart=time.time()
@@ -344,13 +346,15 @@ def death(name):
             victorious(playerteams[player])
 
 def playerJoins(name,ip):
-    announceGold(name,'Welcome, ' + name + '. For UHC command help, say !help in chat.')
+    if name not in players:
+        announceGold(name,'Welcome, ' + name + '. For UHC command help, say !help in chat.')
     if name not in players | spectators and timeStart != None:
         minecraft.sendline('scoreboard players set '+name+' dead 1\n')
     players.add(name)
 
 def playerLeaves(name):
-    players.remove(name)
+    if name in players:
+        players.remove(name)
 
 def saveConfig(name):
     config['x'] = x
@@ -386,6 +390,7 @@ def opHelp():
     announce(name,'{"text":"!spectate","color":"white"},{"text":" View or toggle spectators","color":"gold"}')
     announce(name,'{"text":"!teamswap","color":"white"},{"text":" Swap two players between teams","color":"gold"}')
     announce(name,'{"text":"!teamup","color":"white"},{"text":" Generate and assign teams","color":"gold"}')
+    announce(name,'{"text":"!refreshplayers","color":"white"},{"text":" Attempt to redetect players","color":"gold"}')
     announce(name,'{"text":"!begin","color":"white"},{"text":" Start the game","color":"gold"}')
     announce(name,'{"text":"!op","color":"white"},{"text":" Get op on server itself","color":"gold"}')
 
@@ -500,12 +505,19 @@ def handleCommand(name,command,args):
                 announceGold(name,'!teamswap player1 player2')
         if command=='spectate':
             spectate(name,args)
+        if command=='refreshplayers':
+            minecraft.sendline('list\n')
         if command=='op':
             minecraft.sendline('op '+name+'\n')
 
 def fixName(name):
+    # Spigot, with team colours
+    if name[0]=='?':
+        return name[3:-3]
+    # Vanilla, with team colours
     if name[0]=='§':
         return name[2:-2]
+    # No colours
     else:
         return name
 
@@ -606,6 +618,13 @@ while(running):
                 for name in worldborderAnnounce:
                     announceGold(name,line)
                 worldborderAnnounce.clear()
+
+            # Look for missed players (respond to /list)
+            m = regexp['playerlist'].match(line)
+            if m!=None:
+                for name in m.group().split(', '):
+                    if name not in players:
+                        playerJoins(name,'')
 
             # Look for player deaths
             m = regexp['death'].match(line)
