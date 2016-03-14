@@ -13,19 +13,19 @@ import yaml
 import time
 import random
 
-# Name of server jar
-server_jar = 'spigot-1.9.jar'
-
 # Config file
 configfile = 'uhc_wrapper.yml'
-
-# Command line builder
-commandline = 'java -jar ' + server_jar + ' nogui'
 
 uhcprefix = '{"text":"[UHC] ","color":"yellow"}'
 
 # read the config
 config = yaml.load(open(configfile,'r'))
+# Get the server jar
+server_jar = config['jar']
+# Command line builder
+commandline = 'java -jar ' + server_jar + ' nogui'
+
+# Set variables defined in config
 x = int(config['x'])
 z = int(config['z'])
 minuteMarker = int(config['minutemarker'])
@@ -81,7 +81,7 @@ regexp['border'] = re.compile('^World border is currently [0-9]+ blocks wide')
 # For technical reasons...
 regexp['unknown'] = re.compile('^Unknown command. Try /help for a list of commands')
 # List of players
-regexp['playerlist'] = re.compile('^(\w+, )*(\w+)')
+regexp['playerlist'] = re.compile('^(\w+, )*(\w+)$')
 # Death messages. Why can't this be simple?
 regexp['death'] = re.compile('.+ was shot by arrow|'+
 '.+ was shot by .+|'+
@@ -251,6 +251,7 @@ def buildLobby():
     minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+1)+' minecraft:repeating_command_block 3 replace {auto:1b,Command:"tp @e[tag=Origin] ~ ~ ~ ~10 ~"}\n')
     minecraft.sendline('setblock '+str(x+3)+' 1 '+str(z+2)+' minecraft:chain_command_block 3 replace {auto:1b,Command:"weather clear"}\n')
     # Put everybody in the lobby
+    minecraft.sendline('gamemode 2 @a')
     minecraft.sendline('spreadplayers '+str(x)+' '+str(z)+' 0 6 true @a')
     announceAllGold('Welcome to the Ultra Hardcore lobby')
 
@@ -275,6 +276,8 @@ def prepareGame():
     minecraft.sendline('scoreboard objectives add health health\n')
     minecraft.sendline('scoreboard objectives setdisplay list health\n')
     minecraft.sendline('scoreboard objectives add spectating dummy\n')
+    global timeStart
+    timeStart = None
 
 def beginGame():
     # Create a room for dead players
@@ -333,6 +336,7 @@ def victorious(team):
 
 def death(name):
     team = playerteams.pop(name,None)
+    minecraft.sendline('execute @a ~ ~ ~ playsound minecraft:entity.lightning.impact ambient @a[c=1]\n')
     if team == None:
         return
     survivors = 0
@@ -340,7 +344,7 @@ def death(name):
         if playerteams[member]==team:
             survivors = survivors + 1
     if survivors == 0:
-        announceAll('{"text":"'+teams[team]+'" have been eliminated","color":"'+teamcolours[team]+'"}')
+        announceAll('{"text":"'+teams[team]+' have been eliminated","color":"'+teamcolours[team]+'"}')
     if len(set(playerteams.values())) == 1:
         for player in playerteams:
             victorious(playerteams[player])
@@ -513,7 +517,7 @@ def handleCommand(name,command,args):
 def fixName(name):
     # Spigot, with team colours
     if name[0]=='?':
-        return name[3:-3]
+        return name[2:-2]
     # Vanilla, with team colours
     if name[0]=='§':
         return name[2:-2]
@@ -526,7 +530,7 @@ def fixName(name):
 ######################
 
 # Spawn the server
-minecraft = pexpect.spawn(commandline,timeout=None,encoding=None)
+minecraft = pexpect.spawn(commandline,timeout=None,encoding=None,env = {"TERM": "dumb"})
 running = minecraft.isalive()
 
 while(running):
@@ -625,6 +629,7 @@ while(running):
                 for name in m.group().split(', '):
                     if name not in players:
                         playerJoins(name,'')
+                print('Players detected: ', players)
 
             # Look for player deaths
             m = regexp['death'].match(line)
@@ -651,7 +656,7 @@ while(running):
             announceAllGold('Minute marker: '+ str(minutesElapsed)+' minutes')
             targetTime = targetTime + minuteMarker * 60
         # Make nametags visible
-        if flag_visibility and minutesElapsed >= config['revealnames']:
+        if flag_visibility and minutesElapsed >= revealnames:
             for team in playerteams:
                 minecraft.sendline('scoreboard teams option '+str(playerteams[team])+' nametagVisibility always\n')
             announceAllGold('Your nametags are now visible to the enemy.')
