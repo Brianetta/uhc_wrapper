@@ -225,11 +225,12 @@ def spectate(name,args):
             if spectator in spectators:
                 spectators.remove(spectator)
                 if timeStart != None:
-                    minecraft.sendline('scoreboard players set '+spectator+' spectating 0')
+                    minecraft.sendline('scoreboard players set '+spectator+' spectating 0\n')
             else:
                 spectators.add(spectator)
                 if timeStart != None:
-                    minecraft.sendline('scoreboard players set '+spectator+' spectating 1')
+                    minecraft.sendline('scoreboard players set '+spectator+' spectating 1\n')
+                    minecraft.sendline('gamemode 3 '+spectator+'\n')
     spectatorOutput = list()
     for spectator in spectators:
         spectatorOutput.append(', ')
