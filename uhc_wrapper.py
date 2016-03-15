@@ -656,7 +656,7 @@ while(running):
             announceAllGold('Minute marker: '+ str(minutesElapsed)+' minutes')
             targetTime = targetTime + minuteMarker * 60
         # Make nametags visible
-        if flag_visibility and minutesElapsed >= revealnames:
+        if flag_visibility and minutesElapsed >= revealNames:
             for team in playerteams:
                 minecraft.sendline('scoreboard teams option '+str(playerteams[team])+' nametagVisibility always\n')
             announceAllGold('Your nametags are now visible to the enemy.')
