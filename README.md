@@ -75,10 +75,10 @@ All commands are typed into the in-game chat, and begin with an exclamation mark
 Natural regeneration is disabled. Players who suffer inujury will need to use golden apples or potions in order to gain health.
 
 ### Name tag visibility
-Effectively a grace period at the beginning of the match, name tags are only visible to members of the same team (and to spectators, who are not given a team). After the given delay has elapsed, nametags become universlly visible, and players are told in chat. They should then be careful to crouch if they want to avoid being seen.
+Effectively a grace period at the beginning of the match, name tags are only visible to members of the same team (and to spectators, who are not given a team). After the given delay has elapsed, nametags become universally visible, and players are told in chat. They should then be careful to crouch if they want to avoid being seen.
 
 ### World border
-A small match area can make games very short and uninteresting, while a large match area can prove the opposite. To avoid these drawbacks, the world will begin at the diameter given in **!border start**, giving the teams time and space to gather materials, craft weapons, etc. After the number of minutes given in **!border timebegin**, the border will begin to shrink. It will shrink to the diameter specified in **!border finish**, and will take the amount of time in minutes specified in **!border duration** to do so. This will force players to congregate in the middle of the map, making conflict much more likely.
+A small match area can make games very short and uninteresting, while a large match area can reduce player interaction. To avoid these drawbacks, the world will begin at the diameter given in **!border start**, giving the teams time and space to gather materials, craft weapons, etc. After the number of minutes given in **!border timebegin**, the border will begin to shrink. It will shrink to the diameter specified in **!border finish**, and will take the amount of time in minutes specified in **!border duration** to do so. This will force players to congregate in the middle of the map, making conflict much more likely.
 
 ### Eternal day / night
 After a configurable delay, the sun can be stopped at midday or midnight. This means that the final fight can take place without fear of spawning mobs, or *with* it, depending on requirements. By default, eternal day begins after 40 minutes, which is two in-game day/night cycles. The match always begins at midday.
