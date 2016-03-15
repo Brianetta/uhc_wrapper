@@ -42,7 +42,7 @@ All commands are typed into the in-game chat, and begin with an exclamation mark
 
 ### Commands that all players can use
   - **!help** - Shows help to the player. Shows additional help to those listed as ops.
-  - **!utc!** - Shows the current UTC time, as understood by the game server. Useful for pre-arranged start times.
+  - **!utc** - Shows the current UTC time, as understood by the game server. Useful for pre-arranged start times.
   - **!time** - Shows the number of minutes elapsed since the match began.
   - **!team** - Shows the name and colour of the player's team, and the names of their team mates.
   - **!border** - Shows the current diameter of the world border
