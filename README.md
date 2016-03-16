@@ -34,6 +34,7 @@ This script runs a Minecraft server, reading its output and entering commands, i
 ## To run the UHC game:
   1. Copy the two files `uhc_wrapper.py` and `uhc_wrapper.yml` into the same directory as your Minecraft server
   2. Edit `uhc_wrapper.yml` and remove the example operator names in `ops`. Add your own, and of anybody you wish to be able to control the game.
+    - You must make sure that the name of your Minecraft server jar is correct.
     - You can edit any of the options here, but apart from the `ops` list and team names everything can be modified in-game.
   3. Start the minecraft server using `python3 uhc_wrapper.py` (Linux or other command line) or by double-clicking the uhc_wrapper.py file (Windows/Mac)
 
