@@ -413,6 +413,8 @@ def opHelp():
     announce(name,'{"text":"!op","color":"white"},{"text":" Get op on server itself","color":"gold"}')
 
 def handleCommand(name,command,args):
+    global x
+    global z
     command = command.lower() # Make commands case insensitive
     if command=='help':
         nonOpHelp()
@@ -439,7 +441,6 @@ def handleCommand(name,command,args):
             destroyLobby()
         if command=='x':
             if args.isnumeric():
-                global x
                 x = int(args)
                 announceGold(name,'X set to '+str(x))
                 minecraft.sendline('worldborder center '+str(x)+' '+str(z)+'\n')
@@ -447,7 +448,6 @@ def handleCommand(name,command,args):
                 announceGold(name,'Centre X is currently '+str(x))
         if command=='z':
             if args.isnumeric():
-                global z
                 z = int(args)
                 announceGold(name,'Z set to '+str(z))
                 minecraft.sendline('worldborder center '+str(x)+' '+str(z)+'\n')
@@ -475,7 +475,6 @@ def handleCommand(name,command,args):
                 if args != subc:
                     suba = args.split()[1]
             if subc in {'day','night','off'}:
-                global config
                 config['eternal']['mode'] = subc
                 announceGold(name,'Sun stops at permanent state: ' + subc.capitalize())
                 if suba.isnumeric():
