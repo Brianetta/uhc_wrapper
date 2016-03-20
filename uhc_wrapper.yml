@@ -45,3 +45,4 @@ worldborder:
   timebegin: 40
 x: 0
 z: 0
+timeout: 10

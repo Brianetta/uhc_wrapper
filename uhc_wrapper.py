@@ -44,6 +44,7 @@ z = int(config['z'])
 minuteMarker = int(config['minutemarker'])
 teamsize = int(config['playersperteam'])
 revealNames = int(config['revealnames'])
+timeout = int(config['timeout'])
 
 spectators = set(config['ops']) # Default value only
 
@@ -54,6 +55,7 @@ targetTime = 0
 worldborderAnnounce = set()
 teams = {}
 playerteams = {}
+deadPlayers = set()
 teamcolours = {
     0:'red',
     1:'blue',
@@ -74,6 +76,7 @@ teamcolours = {
 flag_border=True;
 flag_visibility=True;
 flag_eternal=True;
+disconnectedPlayers={};
 
 ######################
 # Compile some regular expressions. Things we look for in the minecraft server output.
@@ -174,6 +177,8 @@ def showTeams():
     for team in teams:
         minecraft.sendline('tellraw @a[team='+str(team)+'] ['+uhcprefix+',{"text":"Your team is '+teams[team]+'","color":"'+teamcolours[team]+'"}]\n')
         minecraft.sendline('tellraw @a[team='+str(team)+'] ['+uhcprefix+',{"text":"Your team members are ","color":"gold"},{"selector":"@a[team='+str(team)+']"}]\n')
+    for spectator in spectators:
+        announceGold(spectator,'You are a spectator')
 
 def createTeams():
     destroyTeams()
@@ -245,6 +250,9 @@ def spectate(name,args):
     announceGold(name,'Spectators: '+output)
 
 def buildLobby():
+    # Refresh players
+    minecraft.sendline('list\n')
+    deadPlayers.clear()
     # Build a lobby
     minecraft.sendline('fill '+ str(x-9)+' 251 '+ str(z-9)+' '+ str(x+8)+' 255 '+ str(z+8)+' minecraft:barrier\n')
     minecraft.sendline('fill '+ str(x-9)+' 255 '+ str(z-9)+' '+ str(x+8)+' 255 '+ str(z+8)+' minecraft:stained_glass 15\n')
@@ -348,11 +356,23 @@ def victorious(team):
     announceAll('{"text":"'+teams[team]+' have won UHC","color":"'+teamcolours[team]+'"}')
     minecraft.sendline('tellraw @a [{"text":"Congratulations to ","color":"gold"},{"selector":"@a[team='+str(team)+']"}]\n')
 
+def allDead(player):
+    destroyLobby()
+    minecraft.sendline('gamemode 3 @a[m=2]\n')
+    minecraft.sendline('title @a subtitle {"text":"All players are dead.","color":"white"}\n')
+    minecraft.sendline('title @a title {"text":"Game Over","color":"gold"}\n')
+    announceAllGold(name+' was the last player standing')
+
 def death(name):
+    if name in deadPlayers:
+        return
+    deadPlayers.add(name)
     team = playerteams.pop(name,None)
     minecraft.sendline('execute @a ~ ~ ~ playsound minecraft:entity.lightning.impact ambient @a[c=1]\n')
     if team == None:
         return
+    if name in players:
+        players.remove(name)
     survivors = 0
     for member in playerteams:
         if playerteams[member]==team:
@@ -362,17 +382,28 @@ def death(name):
     if len(set(playerteams.values())) == 1:
         for player in playerteams:
             victorious(playerteams[player])
+    if len(set(playerteams.values())) == 0:
+        allDead(name)
+        
 
 def playerJoins(name,ip):
     if name not in players:
         announceGold(name,'Welcome, ' + name + '. For UHC command help, say !help in chat.')
+        players.add(name)
+    # New joiners (after game start) treated as dead
     if name not in players | spectators and timeStart != None:
         minecraft.sendline('scoreboard players set '+name+' dead 1\n')
-    players.add(name)
+    # Players rejoining after the timeout are made dead
+    if timeStart != None and name in disconnectedPlayers:
+        if time.time() > disconnectedPlayers[name] + timeout:
+            announceAllGold(name+' has been declared dead.')
+            death(name)
+        del disconnectedPlayers[name]
 
 def playerLeaves(name):
-    if name in players:
-        players.remove(name)
+    # Make a note of when a player left (ignoring spectators)
+    if name in players - spectators:
+        disconnectedPlayers[name] = time.time()
 
 def saveConfig(name):
     config['x'] = x
@@ -380,6 +411,7 @@ def saveConfig(name):
     config['minutemarker'] = minuteMarker
     config['playersperteam'] = teamsize
     config['revealnames'] = revealNames
+    config['timeout'] = timeout
     handle = open(configfile,'w')
     handle.write(yaml.dump(config,default_flow_style=False))
     handle.close()
@@ -403,6 +435,7 @@ def opHelp():
     announce(name,'{"text":"!save","color":"white"},{"text":" Save configuration","color":"gold"}')
     announce(name,'{"text":"!minutes","color":"white"},{"text":" Set the time between minute markers","color":"gold"}')
     announce(name,'{"text":"!teamsize","color":"white"},{"text":" Set number of players per team","color":"gold"}')
+    announce(name,'{"text":"!timeout","color":"white"},{"text":" Set number of seconds that players can be disconnected","color":"gold"}')
     announce(name,'{"text":"!eternal","color":"white"},{"text":" Set eternal day/night/off (after minutes)","color":"gold"}')
     announce(name,'{"text":"!revealnames","color":"white"},{"text":" Set delay before players can see enemy name tags","color":"gold"}')
     announce(name,'{"text":"!spectate","color":"white"},{"text":" View or toggle spectators","color":"gold"}')
@@ -468,6 +501,11 @@ def handleCommand(name,command,args):
                 global teamsize
                 teamsize = int(args)
             announceGold(name,'Team size is set to '+str(teamsize)+' players')
+        if command=='timeout':
+            if args.isnumeric():
+                global timeout
+                timeout = int(args)
+            announceGold(name,'Death on disconnect timeout is set to '+str(timeout)+' seconds')
         if command=='eternal':
             subc,suba='',''
             if args!='':
@@ -500,7 +538,6 @@ def handleCommand(name,command,args):
                 if args != subc:
                     suba = args.split()[1]
             if subc in {'duration','finish','start','timebegin'}:
-                global config
                 if suba.isnumeric():
                     config['worldborder'][subc] = int(suba)
             announceGold(name,'World border starting width (start): '+str(config['worldborder']['start']))
@@ -638,7 +675,7 @@ while(running):
 
             # Look for missed players (respond to /list)
             m = regexp['playerlist'].match(line)
-            if m!=None:
+            if m!=None and line != 'list': # 'list' matches a command we use, and isn't likely to be a player )-:
                 for name in m.group().split(', '):
                     if name not in players:
                         playerJoins(name,'')
@@ -690,3 +727,12 @@ while(running):
             minecraft.send('worldborder set '+str(config['worldborder']['finish'])+' '+str(config['worldborder']['duration']*60)+'\n')
             announceAllGold('The world border has started shrinking.')
             flag_border=False
+        # Players who've been disconnected too long
+        deleted = set()
+        for name in disconnectedPlayers:
+            if time.time() > disconnectedPlayers[name] + timeout:
+                announceAllGold(name+' has been declared dead.')
+                deleted.add(name)
+                death(name)
+        for name in deleted:
+            del disconnectedPlayers[name]
