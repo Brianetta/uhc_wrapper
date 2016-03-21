@@ -734,5 +734,6 @@ while(running):
                 announceAllGold(name+' has been declared dead.')
                 deleted.add(name)
                 death(name)
+                minecraft.sendline('scoreboard players set '+name+' dead 1\n')
         for name in deleted:
             del disconnectedPlayers[name]
