@@ -20,7 +20,6 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pexpect
-import codecs
 import re
 import yaml
 import time
@@ -73,10 +72,10 @@ teamcolours = {
     13:'dark_grey',
     14:'black'
 }
-flag_border=True;
-flag_visibility=True;
-flag_eternal=True;
-disconnectedPlayers={};
+flag_border=True
+flag_visibility=True
+flag_eternal=True
+disconnectedPlayers={}
 
 ######################
 # Compile some regular expressions. Things we look for in the minecraft server output.
@@ -185,7 +184,7 @@ def createTeams():
     teampool = list(players - spectators)
     if len(teampool) == 0:
         announceAllGold('Cannot assign teams, because everybody is spectating')
-        return;
+        return
     numberOfTeams = min(round((len(teampool) / teamsize)+0.5),15) # hard-coded max of 15 teams
     teamnames = config['teamnames'].copy()
     global teams
@@ -259,7 +258,7 @@ def buildLobby():
     # Build a lobby
     minecraft.sendline('fill '+ str(x-9)+' 251 '+ str(z-9)+' '+ str(x+8)+' 255 '+ str(z+8)+' minecraft:barrier\n')
     minecraft.sendline('fill '+ str(x-9)+' 255 '+ str(z-9)+' '+ str(x+8)+' 255 '+ str(z+8)+' minecraft:stained_glass 15\n')
-    minecraft.sendline('fill '+ str(x-8)+' 253 '+ str(z-8)+' '+ str(x+7)+' 255 '+ str(z+7)+' minecraft:air\n');
+    minecraft.sendline('fill '+ str(x-8)+' 253 '+ str(z-8)+' '+ str(x+7)+' 255 '+ str(z+7)+' minecraft:air\n')
     minecraft.sendline('setblock '+str(x)+' 252 '+str(z)+' minecraft:end_portal_frame 4\n')
     minecraft.sendline('setblock '+str(x)+' 253 '+str(z)+' minecraft:stained_glass_pane 3\n')
     minecraft.sendline('setworldspawn '+str(x)+' 253 '+str(z))
@@ -616,7 +615,7 @@ while(running):
         None
     elif result == 2:
         # To remove in production; assert that '^.*\r\n' left nothing out in front
-        assert(minecraft.before==b'')
+        assert(minecraft.before == b'')
 
         # pexpect docs insist that its regex matching is 100% non-greedy.
         # This is not true at all. It'll randomly be greedy.
