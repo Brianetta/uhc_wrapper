@@ -211,6 +211,7 @@ def createTeams():
     for player in playerteams:
         minecraft.sendline('scoreboard teams join '+str(playerteams[player])+' '+player+'\n')
     showTeams()
+    minecraft.sendline('effect @a minecraft:glowing 3 1 true')
 
 def swapTeamMember(player1,player2):
     if set(playerteams.keys()) & {player1,player2} == {player1,player2}:
@@ -221,6 +222,8 @@ def swapTeamMember(player1,player2):
         minecraft.sendline('scoreboard teams leave '+player2+'\r')
         minecraft.sendline('scoreboard teams join '+str(playerteams[player1])+' '+player1+'\r')
         minecraft.sendline('scoreboard teams join '+str(playerteams[player2])+' '+player2+'\r')
+        minecraft.sendline('effect @a[team='+str(playerteams[player1])+'] minecraft:glowing 3 1 true')
+        minecraft.sendline('effect @a[team='+str(playerteams[player2])+'] minecraft:glowing 3 1 true')
 
 def spectate(name,args):
     if args=='':
