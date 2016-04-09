@@ -1,5 +1,5 @@
-jar:
-  minecraft_server.1.9.2.jar
+jar: minecraft_server.1.9.2.jar
+java: java -server
 eternal:
   mode: day
   timebegin: 40

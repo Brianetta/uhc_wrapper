@@ -33,10 +33,9 @@ uhc_prefix = '{"text":"[UHC] ","color":"yellow"}'
 
 # read the config
 config = yaml.load(open(configfile, 'r'))
-# Get the server jar
-server_jar = config['jar']
+
 # Command line builder
-commandline = 'java -jar ' + server_jar + ' nogui'
+commandline = str(config['java']) + ' -jar ' + config['jar'] + ' nogui'
 
 # Set variables defined in config
 x = int(config['x'])
