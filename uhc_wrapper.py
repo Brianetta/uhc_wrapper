@@ -539,8 +539,19 @@ def op_help():
     announce(name, '{"text":"!teamup","color":"white"},{"text":" Generate and assign teams","color":"gold"}')
     announce(name, '{"text":"!refreshplayers","color":"white"},{"text":" Attempt to redetect players","color":"gold"}')
     announce(name, '{"text":"!begin","color":"white"},{"text":" Start the game","color":"gold"}')
+    announce(name, '{"text":"!abort","color":"white"},{"text":" Abort and reset running game","color":"gold"}')
     announce(name, '{"text":"!op","color":"white"},{"text":" Get op on server itself","color":"gold"}')
 
+
+def abort_game():
+    global target_time
+    global time_start
+    target_time = None
+    time_start = None
+    prepare_game()
+    build_lobby()
+    minecraft.sendline('clear @a\n')
+    announce_all_gold('Aborting UHC match.')
 
 def handle_command(name, command, args):
     global x
@@ -628,6 +639,8 @@ def handle_command(name, command, args):
             save_config(name)
         if command == 'begin':
             begin_game()
+        if command == 'abort':
+            abort_game()
         if command == 'border' and time_start is None:
             subc, suba = '', ''
             if args != '':
