@@ -709,7 +709,7 @@ while running:
         running = False
     elif result == 1:
         # expect was blocking, so just do nothing here. No-op.
-        None
+        pass
     elif result == 2:
         # To remove in production; assert that '^.*\r\n' left nothing out in front
         assert (minecraft.before == b'')
