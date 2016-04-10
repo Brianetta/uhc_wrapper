@@ -68,6 +68,7 @@ All commands are typed into the in-game chat, and begin with an exclamation mark
   - **!teamup** - Generates teams (randomly named from the list in `uhc_wrapper.yml`) and assigns players at random, trying to keep the number of player in each team at the correct level. If numbers are uneven, teams could be smaller. If there are too many players, teams will be bigger (there is a maximum of 15 teams). After players are allocated to teams, they are briefly given the spectral glow effect.
   - **!refreshplayers** - The script can sometimes miss players joining the server, especially if they all join at once. This will attempt to redetect players in the event that some are not assigned a team by **!teamup**. It will be necessary to run **!teamup** again.
   - **!begin** - This launches the match. The lobby is destroyed, the death room is created, the game clock is started and all triggers are put in place.
+  - **!abort** - This aborts the match. The clocks are reset, the lobby rebuilt, and all layers have their inventories cleared and are returned to the lobby.
   - **!op** - Gives actual server op privileges to the player. Since there is no access to the console while this script is running, this can be necessary.
 
 ## UHC match concepts
