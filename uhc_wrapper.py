@@ -548,6 +548,7 @@ def abort_game():
     global time_start
     target_time = None
     time_start = None
+    destroy_teams()
     prepare_game()
     build_lobby()
     minecraft.sendline('clear @a\n')
