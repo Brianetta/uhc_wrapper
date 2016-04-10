@@ -795,22 +795,22 @@ while running:
     # Scheduled tasks!
     if time_start is not None:
         t = time.time()
-        minutesElapsed = int((t - time_start) / 60)
+        minutes_elapsed = int((t - time_start) / 60)
         # Show the minute marker
         if target_time < time_start:
             target_time = time_start + minute_marker * 60
         if t > target_time:
             minecraft.sendline('execute @a ~ ~ ~ playsound minecraft:entity.firework.launch ambient @a[c=1]\n')
-            announce_all_gold('Minute marker: ' + str(minutesElapsed) + ' minutes')
+            announce_all_gold('Minute marker: ' + str(minutes_elapsed) + ' minutes')
             target_time += minute_marker * 60
         # Make nametags visible
-        if flag_visibility and minutesElapsed >= reveal_names:
+        if flag_visibility and minutes_elapsed >= reveal_names:
             for team in playerteams:
                 minecraft.sendline('scoreboard teams option ' + str(playerteams[team]) + ' nametagVisibility always\n')
             announce_all_gold('Your nametags are now visible to the enemy.')
             flag_visibility = False
         # Eternal day/night
-        if flag_eternal and minutesElapsed >= config['eternal']['timebegin']:
+        if flag_eternal and minutes_elapsed >= config['eternal']['timebegin']:
             if config['eternal']['mode'] == 'day':
                 minecraft.sendline('gamerule doDaylightCycle false\n')
                 minecraft.sendline('time set 6000\n')
@@ -821,7 +821,7 @@ while running:
                 announce_all_gold('Eternal night has begun.')
             flag_eternal = False
         # Worldborder
-        if flag_border and minutesElapsed >= config['worldborder']['timebegin']:
+        if flag_border and minutes_elapsed >= config['worldborder']['timebegin']:
             minecraft.send('worldborder set ' + str(config['worldborder']['finish']) + ' ' + str(
                 config['worldborder']['duration'] * 60) + '\n')
             announce_all_gold('The world border has started shrinking.')
