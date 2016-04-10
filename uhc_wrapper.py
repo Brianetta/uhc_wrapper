@@ -22,6 +22,7 @@
 import random
 import re
 import time
+import math
 
 import pexpect
 import yaml
@@ -200,7 +201,7 @@ def create_teams():
     if len(teampool) == 0:
         announce_all_gold('Cannot assign teams, because everybody is spectating')
         return
-    number_of_teams = min(round((len(teampool) / teamsize) + 0.5), 15)  # hard-coded max of 15 teams
+    number_of_teams = min(math.ceil(len(teampool) / teamsize), 15)  # hard-coded max of 15 teams
     teamnames = config['teamnames'].copy()
     global teams
     global playerteams
